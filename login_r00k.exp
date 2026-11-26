@@ -1,0 +1,116 @@
+#!/usr/bin/expect -f
+
+# 2026.11.26 thu r00k add permission denied to proc login
+#                         proc _msg
+#                         _script_name/_debug/_nodisplay/_verbose
+
+if {[info exists ::env(_debug)    ]} { exp_internal 1 }
+if {[info exists ::env(_nodisplay)]} { log_user 0      ;# does not display
+} else                               { log_user 1     };#          display as is
+if {[info exists ::env(_verbose)  ]} {set _verbose 1
+} else                               {set _verbose 0}
+
+
+set timeout 20
+set _script_name [file tail $argv0]
+
+proc _msg {_text} {
+ global _verbose _script_name
+ if {$_verbose} {
+  puts "\n${_script_name}: $_text"
+ }
+}
+
+source ./password_r00a.conf
+
+# Shell prompt pattern
+set prompt_pattern {\$ $}
+
+# Login procedure
+proc login {host user password options} {
+
+    global prompt_pattern
+    global spawn_id
+    set ::env(TERM) vt100
+    spawn ssh {*}$options $user@$host
+
+    expect {
+        -re {Are you sure you want to continue connecting.*\(yes/no\)} {
+            send "yes\r"
+            exp_continue
+        }
+        -re "(?i)password:" {
+            send "$password\r"
+            exp_continue
+        }
+        -re $prompt_pattern {
+           #puts "Login successful"
+            _msg "Login successful"
+            return 1
+        }
+        -re {Permission denied} {
+           #puts "ERROR: Authentication failed, now send ctrl+c..."
+            _msg "ERROR: Authentication failed, now send ctrl+c..."
+            send -- "\003"
+            expect eof
+            return 0
+        }
+        timeout {
+           #puts "Login timeout"
+            _msg "Login timeout"
+            return 0
+        }
+        eof {
+           #puts "Connection failed"
+            _msg "Connection failed"
+            return 0
+        }
+    }
+}
+
+# Command execution procedure
+proc cmd {command} {
+
+    global prompt_pattern
+    global spawn_id
+
+    send -i $spawn_id -- "$command\r"
+
+    expect {
+        -i  $spawn_id
+        -re $prompt_pattern {
+            return 1
+        }
+        timeout {
+           #puts "Command timeout"
+            _msg "Command timeout"
+            return 0
+        }
+        eof {
+           #puts "Connection lost"
+            _msg "Connection lost"
+            return 0
+        }
+    }
+}
+
+# Main process
+if {[login $HOST $USER $PASSWORD $ssh_option]} {
+
+    if {[cmd "hostname"] &&
+        [cmd "whoami"] &&
+        [cmd "date"]} {
+
+        send "exit\r"
+        expect eof
+
+       #puts "Logout completed"
+        _msg "Logout completed"
+
+    } else {
+
+        send "exit\r"
+        expect eof
+    }
+}
+
