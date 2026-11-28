@@ -40,12 +40,12 @@
  if {$_verbose} { _msg "_pfile is $_pfile ."                   }
 
  # Shell prompt pattern
- set prompt_pattern {\$ $}
+ set _prompt_pattern {\$ $}
 
  # Login procedure
  proc _login {host user password options} {
 
-    global prompt_pattern
+    global _prompt_pattern
     global spawn_id
     set ::env(TERM) vt100
     spawn ssh {*}$options $user@$host
@@ -57,7 +57,7 @@
      } -re "(?i)password:" {
        send "$password\r"
        exp_continue
-     } -re $prompt_pattern {
+     } -re $_prompt_pattern {
         _msg "login successful"
         return 1
      } -re {Permission denied} {
@@ -71,12 +71,12 @@
 
  # Command execution procedure
  proc _cmd {command} {
-  global prompt_pattern
+  global _prompt_pattern
   global spawn_id
   send -i $spawn_id -- "$command\r"
   expect {
    -i  $spawn_id
-   -re $prompt_pattern { return 1
+   -re $_prompt_pattern { return 1
    } timeout           { _msg "timeout";return 0
    } eof               { _msg "eof"    ;return 0
    } } }
@@ -94,7 +94,6 @@
         _msg "logout completed"
 
     } else {
-
         send "exit\r"
         expect eof
     }
